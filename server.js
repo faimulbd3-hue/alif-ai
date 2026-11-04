@@ -54,6 +54,13 @@ const providerConfig = {
     defaultModel: "gemini-3.8-flash",
     url: "https://generativelanguage.googleapis.com/v1beta/models",
     headers: () => ({})
+  },
+  cloudflare: {
+    key: "CLOUDFLARE_API_TOKEN",
+    model: "CLOUDFLARE_MODEL",
+    defaultModel: "@cf/meta/llama-3.1-8b-instruct",
+    url: "https://api.cloudflare.com/client/v4/accounts",
+    headers: (key) => ({ Authorization: `Bearer ${key}` })
   }
 };
 
@@ -66,6 +73,16 @@ async function requestChat(provider, key, model, messages) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 90000);
   try {
+  if (provider.name === "cloudflare") {
+    const response = await fetch(`${provider.url}/${process.env.CLOUDFLARE_ACCOUNT_ID}/ai/run/${model}`, {
+      method: "POST",
+      headers: { ...provider.headers(key), "Content-Type": "application/json" },
+      body: JSON.stringify({ messages }),
+      signal: controller.signal
+    });
+    const data = await response.json();
+    return { response, data, reply: data.result?.response || data.result?.text };
+  }
   if (provider.name === "gemini") {
     const response = await fetch(`${provider.url}/${model}:generateContent?key=${encodeURIComponent(key)}`, {
       method: "POST",
