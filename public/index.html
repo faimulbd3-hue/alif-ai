@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="bn">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Alif AI — your intelligent everyday assistant." />
+    <title>Alif AI — Intelligent Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand"><div class="brand-mark">A</div><div><strong>Alif AI</strong><span>Your intelligent sidekick</span></div></div>
+        <button class="new-chat" id="newChat"><span>＋</span> নতুন চ্যাট <kbd>⌘ K</kbd></button>
+        <nav class="nav-links" aria-label="Main navigation">
+          <button class="nav-link active"><span>✦</span> Assistant</button>
+          <button class="nav-link"><span>⌕</span> Web Search <em>Pro</em></button>
+          <button class="nav-link"><span>▣</span> Files & Documents</button>
+          <button class="nav-link"><span>⌁</span> Coding Agent</button>
+        </nav>
+        <div class="history-heading"><span>Recent chats</span><button aria-label="Search chats">⌕</button></div>
+        <div class="chat-history" id="chatHistory"></div>
+        <div class="sidebar-bottom">
+          <button class="profile"><div class="avatar">F</div><span><strong>Faimul</strong><small>Free plan</small></span><b>•••</b></button>
+        </div>
+      </aside>
+      <main class="main">
+        <header class="topbar"><button class="icon-button mobile-only" id="menuToggle">☰</button><div class="breadcrumb"><span>Alif AI</span><b>/</b><strong>Assistant</strong></div><div class="top-actions"><button class="icon-button" id="themeToggle" aria-label="Toggle theme">☼</button><button class="upgrade">Upgrade <span>↗</span></button></div></header>
+        <section class="conversation" id="conversation">
+          <div class="welcome" id="welcome">
+            <div class="welcome-icon">✦</div>
+            <p class="eyebrow">Good morning, Faimul</p>
+            <h1>How can I help<br /><span>you today?</span></h1>
+            <p class="welcome-copy">Ask me anything, explore ideas, or get things done.<br />I'm here to help you think better and move faster.</p>
+            <div class="suggestions">
+              <button data-prompt="একটি modern portfolio website-এর পরিকল্পনা তৈরি করো"><span>✦</span><b>Plan a project</b><small>Start something new</small><i>→</i></button>
+              <button data-prompt="আমাকে একটি creative story idea দাও"><span>✎</span><b>Get creative</b><small>Ideas that inspire</small><i>→</i></button>
+              <button data-prompt="JavaScript debugging-এর সেরা tips দাও"><span>⌁</span><b>Learn something</b><small>Expand your knowledge</small><i>→</i></button>
+            </div>
+          </div>
+          <div class="messages" id="messages" aria-live="polite"></div>
+        </section>
+        <section class="composer-wrap">
+          <div class="quick-tools"><button data-prompt="আজকের জন্য একটি productivity plan তৈরি করো">✦ <span>Ideas</span></button><button id="searchButton">⌕ <span>Web search</span></button><button id="fileButton">⌑ <span>Attach file</span></button><button id="voiceButton">◉ <span>Voice</span></button><input id="fileInput" type="file" accept=".pdf,.txt,.png,.jpg,.jpeg" hidden /></div>
+          <form class="composer" id="chatForm"><textarea id="messageInput" rows="1" placeholder="Message Alif AI..." aria-label="Message Alif AI"></textarea><div class="composer-footer"><span>Alif AI can make mistakes. Check important info.</span><button class="send-button" type="submit" aria-label="Send message">↑</button></div></form>
+        </section>
+        <footer>Built with care by <b>Alif AI</b> <span>•</span> Intelligent. Simple. Yours.</footer>
+      </main>
+    </div>
+    <div class="toast" id="toast"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
