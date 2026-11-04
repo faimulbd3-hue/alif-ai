@@ -202,7 +202,16 @@ $("#fileButton").addEventListener("click", () => $("#fileInput").click());
 $("#fileInput").addEventListener("change", async (event) => {
   const file = event.target.files[0]; if (!file) return;
   const data = new FormData(); data.append("file", file);
-  try { const response = await fetch("/api/upload", { method: "POST", body: data }); const result = await response.json(); if (!response.ok) throw new Error(result.error); toast(result.message); await loadFiles(); }
+  try {
+    const response = await fetch("/api/upload", { method: "POST", body: data });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error);
+    filesPanel.hidden = true;
+    addMessage("user", `📎 ${result.name}\n${Math.ceil(result.size / 1024)} KB`);
+    addMessage("assistant", `${result.name} upload হয়েছে। এখন এই file নিয়ে প্রশ্ন করতে পারেন বা analysis চাইতে পারেন।`);
+    toast(result.message);
+    await loadFiles();
+  }
   catch (error) { toast(error.message); }
 });
 renderHistory();
