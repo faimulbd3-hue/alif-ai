@@ -13,7 +13,7 @@ function saveHistory() { localStorage.setItem("alif-history", JSON.stringify(his
 function renderHistory() {
   chatHistory.innerHTML = history.slice(-8).reverse().map((item) => {
     const index = history.indexOf(item);
-    return `<button class="chat-item" data-history-index="${index}"><span>✦</span>${escapeHtml(item.title)}</button>`;
+    return `<div class="chat-item" data-history-index="${index}"><button class="chat-open"><span>✦</span>${escapeHtml(item.title)}</button><button class="chat-delete" aria-label="Delete chat" title="Delete chat">×</button></div>`;
   }).join("");
 }
 function loadChat(index) {
@@ -113,7 +113,17 @@ document.querySelectorAll("[data-prompt]").forEach((button) => button.addEventLi
 $("#newChat").addEventListener("click", () => { messages.innerHTML = ""; messages.style.display = "none"; welcome.style.display = "block"; input.focus(); });
 chatHistory.addEventListener("click", (event) => {
   const item = event.target.closest(".chat-item");
-  if (item) loadChat(Number(item.dataset.historyIndex));
+  if (!item) return;
+  const index = Number(item.dataset.historyIndex);
+  if (event.target.closest(".chat-delete")) {
+    history.splice(index, 1);
+    saveHistory();
+    messages.innerHTML = "";
+    messages.style.display = "none";
+    welcome.style.display = "block";
+    return;
+  }
+  if (event.target.closest(".chat-open")) loadChat(index);
 });
 document.querySelectorAll(".nav-link").forEach((button) => button.addEventListener("click", () => {
   document.querySelectorAll(".nav-link").forEach((item) => item.classList.remove("active"));
