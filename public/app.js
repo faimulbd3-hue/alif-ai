@@ -13,11 +13,42 @@ function saveHistory() { localStorage.setItem("alif-history", JSON.stringify(his
 function renderHistory() {
   chatHistory.innerHTML = history.slice(-8).reverse().map((item, index) => `<button class="chat-item ${index === 0 ? "active" : ""}"><span>✦</span>${item.title}</button>`).join("");
 }
+function escapeHtml(value) {
+  return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
+}
+function renderReply(text) {
+  const codeBlocks = [];
+  const withoutCode = text.replace(/```([\w-]*)\n?([\s\S]*?)```/g, (_match, language, code) => {
+    const id = `code-${codeBlocks.length}`;
+    codeBlocks.push({ id, language: language.toLowerCase(), code: code.trim() });
+    return `\u0000${id}\u0000`;
+  });
+  return withoutCode.split(/\u0000(code-\d+)\u0000/).map((part) => {
+    const block = codeBlocks.find((item) => item.id === part);
+    if (!block) return escapeHtml(part).replace(/\n/g, "<br>");
+    const preview = block.language === "html" ? `<button class="code-action preview-code" data-code-id="${block.id}">Preview</button>` : "";
+    return `<div class="code-box"><div class="code-toolbar"><span>${block.language || "code"}</span><div>${preview}<button class="code-action copy-code" data-code-id="${block.id}">Copy</button></div></div><pre><code>${escapeHtml(block.code)}</code></pre></div>`;
+  }).join("");
+}
 function addMessage(role, text) {
   welcome.style.display = "none"; messages.style.display = "flex";
   const node = document.createElement("div"); node.className = `message ${role}`;
   node.innerHTML = `<div class="message-avatar">${role === "user" ? "F" : "A"}</div><div class="message-bubble"></div>`;
-  node.querySelector(".message-bubble").textContent = text; messages.appendChild(node);
+  const bubble = node.querySelector(".message-bubble");
+  if (role === "assistant" && text.includes("```")) {
+    bubble.innerHTML = renderReply(text);
+    bubble.querySelectorAll(".copy-code").forEach((button) => button.addEventListener("click", async () => {
+      const code = bubble.querySelectorAll(".code-box")[Number(button.dataset.codeId.split("-")[1])]?.querySelector("code")?.textContent || "";
+      await navigator.clipboard.writeText(code); button.textContent = "Copied";
+      setTimeout(() => { button.textContent = "Copy"; }, 1600);
+    }));
+    bubble.querySelectorAll(".preview-code").forEach((button) => button.addEventListener("click", () => {
+      const code = bubble.querySelectorAll(".code-box")[Number(button.dataset.codeId.split("-")[1])]?.querySelector("code")?.textContent || "";
+      const preview = window.open("", "_blank", "noopener,noreferrer");
+      if (preview) { preview.document.write(code); preview.document.close(); }
+    }));
+  } else bubble.textContent = text;
+  messages.appendChild(node);
   $(".conversation").scrollTop = $(".conversation").scrollHeight;
 }
 function showGenerating() {
