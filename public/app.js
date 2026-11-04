@@ -147,7 +147,18 @@ async function sendMessage(text) {
       input.value = "";
       input.style.height = "auto";
       await loadFiles();
-      toast(`${uploadResult.name} message-এর সঙ্গে attach হয়েছে`);
+      const question = message || `এই ফাইলটি সংক্ষেপে বিশ্লেষণ করো: ${uploadResult.name}`;
+      selectedFile = null;
+      const context = history.flatMap((item) => item.messages || []).slice(-12);
+      const chatResponse = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: question, history: context, attachment: { name: uploadResult.name, text: uploadResult.text || "" } })
+      });
+      const chatResult = await chatResponse.json().catch(() => ({}));
+      if (!chatResponse.ok) throw new Error(chatResult.error || "ফাইল বিশ্লেষণ করা যায়নি।");
+      addMessage("assistant", chatResult.reply || chatResult.response || "ফাইল থেকে কোনো উত্তর পাওয়া যায়নি।");
+      toast(`${uploadResult.name} বিশ্লেষণ করা হয়েছে`);
       return;
     } catch (error) {
       toast(error.message);

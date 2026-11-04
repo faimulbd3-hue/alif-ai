@@ -1,5 +1,6 @@
 const express = require("express");
 const multer = require("multer");
+const pdfParse = require("pdf-parse");
 const fs = require("fs");
 const path = require("path");
 
@@ -89,7 +90,7 @@ async function requestChat(provider, key, model, messages) {
 }
 
 app.post("/api/chat", async (req, res) => {
-  const { message, history = [], model } = req.body || {};
+  const { message, history = [], model, attachment } = req.body || {};
   if (!message || typeof message !== "string" || !message.trim()) {
     return res.status(400).json({ error: "একটি বার্তা লিখুন।" });
   }
@@ -104,7 +105,9 @@ app.post("/api/chat", async (req, res) => {
     const messages = [
       { role: "system", content: "You are Alif AI, a helpful assistant. Reply in the same primary language as the user's latest message: use natural Bengali for Bengali, natural English for English, or a clean blend only when the user clearly uses both. Never insert random words or phrases from other languages. Keep spelling, grammar, and wording clear and consistent. Use conversation history to preserve the user's project context. For how-to, coding, troubleshooting, or process questions, start with a short introduction and then use numbered steps (1., 2., 3.). When the user asks for HTML or any code, put the complete code in one fenced Markdown code block with the correct language tag (```html, ```css, ```javascript, or ```powershell). Never put code outside that block, never split one requested code example across multiple blocks, and do not replace the requested code with a plan. Keep simple answers concise." },
       ...history.slice(-12),
-      { role: "user", content: message.trim() }
+      { role: "user", content: attachment?.text
+        ? `${message.trim()}\n\nAttached file: ${attachment.name}\nFile content:\n${attachment.text.slice(0, 50000)}`
+        : message.trim() }
     ];
     const result = await requestChat(provider, apiKey, model || process.env[provider.model] || provider.defaultModel, messages);
     const { response, data } = result;
@@ -163,15 +166,26 @@ app.get("/api/search", async (req, res) => {
 
 app.post("/api/upload", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "কোনো ফাইল পাওয়া যায়নি।" });
+  let extractedText = "";
+  if (req.file.mimetype === "application/pdf") {
+    try {
+      extractedText = pdfParse(fs.readFileSync(req.file.path)).then((result) => result.text);
+    } catch (error) {
+      return res.status(422).json({ error: "PDF পড়া যাচ্ছে না।" });
+    }
+  }
   const files = readFileIndex();
   files.push({ id: req.file.filename, name: req.file.originalname, size: req.file.size, uploadedAt: new Date().toISOString() });
   writeFileIndex(files);
-  res.json({
+  const finish = (text) => res.json({
     id: req.file.filename,
     name: req.file.originalname,
     size: req.file.size,
-    message: `${req.file.originalname} আপলোড হয়েছে। PDF/image analysis pipeline-এ পাঠানোর জন্য প্রস্তুত।`
+    text,
+    message: `${req.file.originalname} attach হয়েছে। এখন প্রশ্ন লিখে Send চাপুন।`
   });
+  if (extractedText && typeof extractedText.then === "function") extractedText.then(finish).catch(() => res.status(422).json({ error: "PDF-এর লেখা পড়া যাচ্ছে না।" }));
+  else finish("");
 });
 app.get("/api/files", (_req, res) => res.json({ files: readFileIndex().reverse() }));
 app.delete("/api/files/:id", (req, res) => {
