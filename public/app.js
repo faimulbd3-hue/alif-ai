@@ -185,7 +185,9 @@ async function sendMessage(text) {
     const reply = data.reply || data.response || "কোনো উত্তর পাওয়া যায়নি।";
     history.at(-1).messages.push({ role: "assistant", content: reply });
     saveHistory();
-    hideGenerating(); addMessage("assistant", reply); if (data.mode === "demo") toast("Demo mode — API key যোগ করুন");
+    hideGenerating(); addMessage("assistant", reply);
+    if (data.fallback) toast("OpenRouter limit শেষ — Cloudflare Workers AI ব্যবহার করা হয়েছে");
+    else if (data.mode === "demo") toast("Demo mode — API key যোগ করুন");
   } catch (error) { hideGenerating(); addMessage("assistant", `দুঃখিত, ${error.message}`); toast("সংযোগে সমস্যা হয়েছে"); }
   finally { button.disabled = false; button.textContent = "↑"; }
 }

@@ -69,6 +69,12 @@ function getProvider() {
   return providerConfig[provider] ? { name: provider, ...providerConfig[provider] } : null;
 }
 
+function getConfiguredProvider(name) {
+  const config = providerConfig[name];
+  if (!config || !process.env[config.key]) return null;
+  return { name, ...config };
+}
+
 async function requestChat(provider, key, model, messages) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 90000);
@@ -126,13 +132,25 @@ app.post("/api/chat", async (req, res) => {
         ? `${message.trim()}\n\nAttached file: ${attachment.name}\nFile content:\n${attachment.text.slice(0, 50000)}`
         : message.trim() }
     ];
-    const result = await requestChat(provider, apiKey, model || process.env[provider.model] || provider.defaultModel, messages);
-    const { response, data } = result;
+    let activeProvider = provider;
+    let activeKey = apiKey;
+    let activeModel = model || process.env[provider.model] || provider.defaultModel;
+    let result = await requestChat(activeProvider, activeKey, activeModel, messages);
+    let { response, data } = result;
+    const shouldFallback = provider.name === "openrouter" && [402, 403, 429].includes(response.status);
+    const fallbackProvider = getConfiguredProvider("cloudflare");
+    if (!response.ok && shouldFallback && fallbackProvider && process.env.CLOUDFLARE_ACCOUNT_ID) {
+      activeProvider = fallbackProvider;
+      activeKey = process.env[activeProvider.key];
+      activeModel = process.env[activeProvider.model] || activeProvider.defaultModel;
+      result = await requestChat(activeProvider, activeKey, activeModel, messages);
+      ({ response, data } = result);
+    }
     if (!response.ok) {
       return res.status(502).json({ error: data.error?.message || "AI provider উত্তর দিতে পারেনি।" });
     }
     const reply = result.reply || "কোনো উত্তর পাওয়া যায়নি।";
-    return res.json({ reply, response: reply, mode: "live", provider: provider.name });
+    return res.json({ reply, response: reply, mode: "live", provider: activeProvider.name, fallback: activeProvider.name !== provider.name });
   } catch (error) {
     const message = error.name === "AbortError"
       ? "AI service উত্তর দিতে ৯০ সেকেন্ডের বেশি সময় নিয়েছে। কিছুক্ষণ পরে আবার চেষ্টা করুন।"
