@@ -119,23 +119,40 @@ app.post("/api/chat", async (req, res) => {
 app.get("/api/search", async (req, res) => {
   const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
   if (!query) return res.status(400).json({ error: "Search query লিখুন।" });
+  const fetchJson = async (url) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch(url, { signal: controller.signal, headers: { "User-Agent": "Alif-AI/1.0" } });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
   try {
-    const response = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
-    const data = await response.json();
+    const data = await fetchJson(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
     const topics = (data.RelatedTopics || [])
       .flatMap((topic) => topic.Topics || topic)
       .filter((topic) => topic && topic.Text)
       .slice(0, 6)
       .map((topic) => ({ title: topic.Text.split(" - ")[0], text: topic.Text, url: topic.FirstURL }));
-    res.json({
+    if (data.AbstractText || data.Answer || topics.length) return res.json({
       query,
       answer: data.AbstractText || data.Answer || "",
       source: data.AbstractSource || "DuckDuckGo",
       sourceUrl: data.AbstractURL || "",
       results: topics
     });
-  } catch (error) {
-    res.status(502).json({ error: "Web Search service-এর সঙ্গে সংযোগ করা যাচ্ছে না।" });
+    throw new Error("No instant results");
+  } catch (_error) {
+    try {
+      const data = await fetchJson(`https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=6&namespace=0&format=json&origin=*`);
+      const results = (data[1] || []).map((title, index) => ({ title, text: title, url: data[3]?.[index] || "" }));
+      return res.json({ query, answer: "", source: "Wikipedia", sourceUrl: "", results });
+    } catch (_fallbackError) {
+      return res.status(502).json({ error: "Web Search service সাময়িকভাবে unavailable। কিছুক্ষণ পরে আবার চেষ্টা করুন।" });
+    }
   }
 });
 
