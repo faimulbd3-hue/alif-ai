@@ -142,7 +142,7 @@ app.post("/api/chat", async (req, res) => {
     let activeModel = model || process.env[provider.model] || provider.defaultModel;
     let result = await requestChat(activeProvider, activeKey, activeModel, messages);
     let { response, data } = result;
-    if (!response.ok && provider.name === "openrouter" && [402, 403, 429].includes(response.status)) {
+    if (!response.ok && provider.name === "openrouter") {
       const keys = getOpenRouterKeys();
       for (const backupKey of keys.slice(1)) {
         result = await requestChat(provider, backupKey, activeModel, messages);
@@ -153,7 +153,7 @@ app.post("/api/chat", async (req, res) => {
         }
       }
     }
-    const shouldFallback = provider.name === "openrouter" && [402, 403, 429].includes(response.status);
+    const shouldFallback = provider.name === "openrouter" && !response.ok;
     const fallbackProvider = getConfiguredProvider("cloudflare");
     if (!response.ok && shouldFallback && fallbackProvider && process.env.CLOUDFLARE_ACCOUNT_ID) {
       activeProvider = fallbackProvider;
@@ -163,7 +163,8 @@ app.post("/api/chat", async (req, res) => {
       ({ response, data } = result);
     }
     if (!response.ok) {
-      return res.status(502).json({ error: data.error?.message || "AI provider উত্তর দিতে পারেনি।" });
+      const providerError = data.error?.message || data.errors?.[0]?.message || "AI provider উত্তর দিতে পারেনি।";
+      return res.status(502).json({ error: `${activeProvider.name}: ${providerError}` });
     }
     const reply = result.reply || "কোনো উত্তর পাওয়া যায়নি।";
     return res.json({ reply, response: reply, mode: "live", provider: activeProvider.name, fallback: activeProvider.name !== provider.name });
