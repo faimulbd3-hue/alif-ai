@@ -18,7 +18,11 @@ const upload = multer({ dest: uploadDirectory });
 const port = process.env.PORT || 3000;
 
 app.use(express.json({ limit: "2mb" }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), {
+  setHeaders: (response, filePath) => {
+    if (path.basename(filePath) === "app.js") response.setHeader("Cache-Control", "no-store");
+  }
+}));
 
 const demoReply = (message) =>
   `আমি Alif AI। আপনার বার্তা পেয়েছি: “${message}”\n\nএখনও API key যোগ করা হয়নি, তাই এটি demo mode-এ চলছে। .env ফাইলে নির্বাচিত provider-এর API key যোগ করলে real-time AI উত্তর পাবেন।`;
