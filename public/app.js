@@ -54,8 +54,13 @@ function addMessage(role, text) {
     }));
     bubble.querySelectorAll(".preview-code").forEach((button) => button.addEventListener("click", () => {
       const code = bubble.querySelectorAll(".code-box")[Number(button.dataset.codeId.split("-")[1])]?.querySelector("code")?.textContent || "";
-      const preview = window.open("", "_blank", "noopener,noreferrer");
-      if (preview) { preview.document.write(code); preview.document.close(); }
+      const previewUrl = URL.createObjectURL(new Blob([code], { type: "text/html" }));
+      const preview = document.createElement("a");
+      preview.href = previewUrl;
+      preview.target = "_blank";
+      preview.rel = "noopener";
+      preview.click();
+      setTimeout(() => URL.revokeObjectURL(previewUrl), 60000);
     }));
   } else bubble.textContent = text;
   messages.appendChild(node);
