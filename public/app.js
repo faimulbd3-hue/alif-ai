@@ -69,11 +69,14 @@ async function sendMessage(text) {
   const button = $(".send-button"); button.disabled = true; button.textContent = "…";
   showGenerating();
   try {
-    const context = history.flatMap((item) => item.messages || []).slice(-12);
+    const context = history.flatMap((item) => item.messages || []).slice(0, -1).slice(-12);
     const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, history: context }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || `Server error (${response.status})`);
-    hideGenerating(); addMessage("assistant", data.reply || "কোনো উত্তর পাওয়া যায়নি।"); if (data.mode === "demo") toast("Demo mode — API key যোগ করুন");
+    const reply = data.reply || "কোনো উত্তর পাওয়া যায়নি।";
+    history.at(-1).messages.push({ role: "assistant", content: reply });
+    saveHistory();
+    hideGenerating(); addMessage("assistant", reply); if (data.mode === "demo") toast("Demo mode — API key যোগ করুন");
   } catch (error) { hideGenerating(); addMessage("assistant", `দুঃখিত, ${error.message}`); toast("সংযোগে সমস্যা হয়েছে"); }
   finally { button.disabled = false; button.textContent = "↑"; }
 }
