@@ -11,7 +11,19 @@ function toast(text) {
 }
 function saveHistory() { localStorage.setItem("alif-history", JSON.stringify(history)); renderHistory(); }
 function renderHistory() {
-  chatHistory.innerHTML = history.slice(-8).reverse().map((item, index) => `<button class="chat-item ${index === 0 ? "active" : ""}"><span>✦</span>${item.title}</button>`).join("");
+  chatHistory.innerHTML = history.slice(-8).reverse().map((item) => {
+    const index = history.indexOf(item);
+    return `<button class="chat-item" data-history-index="${index}"><span>✦</span>${escapeHtml(item.title)}</button>`;
+  }).join("");
+}
+function loadChat(index) {
+  const chat = history[index];
+  if (!chat) return;
+  messages.innerHTML = "";
+  welcome.style.display = "none";
+  messages.style.display = "flex";
+  chat.messages.forEach((item) => addMessage(item.role === "assistant" ? "assistant" : "user", item.content));
+  chatHistory.querySelectorAll(".chat-item").forEach((item) => item.classList.toggle("active", Number(item.dataset.historyIndex) === index));
 }
 function escapeHtml(value) {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
@@ -99,10 +111,38 @@ $("#chatForm").addEventListener("submit", (event) => { event.preventDefault(); s
 input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 120)}px`; });
 document.querySelectorAll("[data-prompt]").forEach((button) => button.addEventListener("click", () => sendMessage(button.dataset.prompt)));
 $("#newChat").addEventListener("click", () => { messages.innerHTML = ""; messages.style.display = "none"; welcome.style.display = "block"; input.focus(); });
+chatHistory.addEventListener("click", (event) => {
+  const item = event.target.closest(".chat-item");
+  if (item) loadChat(Number(item.dataset.historyIndex));
+});
+document.querySelectorAll(".nav-link").forEach((button) => button.addEventListener("click", () => {
+  document.querySelectorAll(".nav-link").forEach((item) => item.classList.remove("active"));
+  button.classList.add("active");
+  const tool = button.dataset.tool;
+  if (tool === "files") return $("#fileInput").click();
+  if (tool === "coding") {
+    input.placeholder = "Describe the code or bug you want help with...";
+    input.value = "Help me debug this code step by step: ";
+    input.focus();
+    return;
+  }
+  if (tool === "search") {
+    input.placeholder = "What would you like to search?";
+    input.focus();
+    toast("Search mode selected — type your question");
+    return;
+  }
+  input.placeholder = "Message Alif AI...";
+  input.focus();
+}));
 $("#themeToggle").addEventListener("click", () => { document.body.classList.toggle("dark"); localStorage.setItem("alif-theme", document.body.classList.contains("dark") ? "dark" : "light"); });
 if (localStorage.getItem("alif-theme") === "dark") document.body.classList.add("dark");
 $("#menuToggle").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
-$("#searchButton").addEventListener("click", () => toast("Web Search tool শিগগিরই আসছে"));
+$("#searchButton").addEventListener("click", () => {
+  input.placeholder = "What would you like to search?";
+  input.focus();
+  toast("Search mode selected — type your question");
+});
 $("#voiceButton").addEventListener("click", () => { if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) return toast("এই browser-এ voice input নেই"); toast("বলুন, Alif AI শুনছে…"); });
 $("#fileButton").addEventListener("click", () => $("#fileInput").click());
 $("#fileInput").addEventListener("change", async (event) => {

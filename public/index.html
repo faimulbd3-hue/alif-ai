@@ -16,12 +16,12 @@
         <div class="brand"><div class="brand-mark">A</div><div><strong>Alif AI</strong><span>Your intelligent sidekick</span></div></div>
         <button class="new-chat" id="newChat"><span>＋</span> নতুন চ্যাট <kbd>⌘ K</kbd></button>
         <nav class="nav-links" aria-label="Main navigation">
-          <button class="nav-link active"><span>✦</span> Assistant</button>
-          <button class="nav-link"><span>⌕</span> Web Search <em>Pro</em></button>
-          <button class="nav-link"><span>▣</span> Files & Documents</button>
-          <button class="nav-link"><span>⌁</span> Coding Agent</button>
+          <button class="nav-link active" data-tool="assistant"><span>✦</span> Assistant</button>
+          <button class="nav-link" data-tool="search"><span>⌕</span> Web Search <em>Pro</em></button>
+          <button class="nav-link" data-tool="files"><span>▣</span> Files & Documents</button>
+          <button class="nav-link" data-tool="coding"><span>⌁</span> Coding Agent</button>
         </nav>
-        <div class="history-heading"><span>Recent chats</span><button aria-label="Search chats">⌕</button></div>
+        <div class="history-heading"><span>Recent chats</span><button id="historySearch" aria-label="Search chats">⌕</button></div>
         <div class="chat-history" id="chatHistory"></div>
         <div class="sidebar-bottom">
           <button class="profile"><div class="avatar">F</div><span><strong>Faimul</strong><small>Free plan</small></span><b>•••</b></button>
