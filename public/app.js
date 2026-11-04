@@ -6,6 +6,7 @@ const chatHistory = $("#chatHistory");
 const filesPanel = $("#filesPanel");
 let history = JSON.parse(localStorage.getItem("alif-history") || "[]");
 let activeTool = "assistant";
+let selectedFile = null;
 
 function toast(text) {
   const node = $("#toast"); node.textContent = text; node.classList.add("show");
@@ -131,7 +132,28 @@ async function searchWeb(query) {
   }
 }
 async function sendMessage(text) {
-  const message = (text || input.value).trim(); if (!message) return;
+  const message = (text || input.value).trim(); if (!message && !selectedFile) return;
+  if (selectedFile) {
+    try {
+      const uploadData = new FormData();
+      uploadData.append("file", selectedFile);
+      const uploadResponse = await fetch("/api/upload", { method: "POST", body: uploadData });
+      const uploadResult = await uploadResponse.json();
+      if (!uploadResponse.ok) throw new Error(uploadResult.error || "ফাইল upload হয়নি।");
+      addMessage("user", `📎 ${uploadResult.name}\n${Math.ceil(uploadResult.size / 1024)} KB\n\n${message}`);
+      selectedFile = null;
+      $("#attachmentPreview").hidden = true;
+      $("#attachmentPreview").innerHTML = "";
+      input.value = "";
+      input.style.height = "auto";
+      await loadFiles();
+      toast(`${uploadResult.name} message-এর সঙ্গে attach হয়েছে`);
+      return;
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+  }
   input.value = ""; input.style.height = "auto"; addMessage("user", message);
   if (activeTool === "search") return searchWeb(message);
   history.push({ title: message.slice(0, 38), messages: [{ role: "user", content: message }] }); saveHistory();
@@ -199,19 +221,18 @@ $("#searchButton").addEventListener("click", () => {
 });
 $("#voiceButton").addEventListener("click", () => { if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) return toast("এই browser-এ voice input নেই"); toast("বলুন, Alif AI শুনছে…"); });
 $("#fileButton").addEventListener("click", () => $("#fileInput").click());
-$("#fileInput").addEventListener("change", async (event) => {
+$("#fileInput").addEventListener("change", (event) => {
   const file = event.target.files[0]; if (!file) return;
-  const data = new FormData(); data.append("file", file);
-  try {
-    const response = await fetch("/api/upload", { method: "POST", body: data });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error);
-    filesPanel.hidden = true;
-    addMessage("user", `📎 ${result.name}\n${Math.ceil(result.size / 1024)} KB`);
-    addMessage("assistant", `${result.name} upload হয়েছে। এখন এই file নিয়ে প্রশ্ন করতে পারেন বা analysis চাইতে পারেন।`);
-    toast(result.message);
-    await loadFiles();
-  }
-  catch (error) { toast(error.message); }
+  selectedFile = file;
+  const preview = $("#attachmentPreview");
+  preview.hidden = false;
+  preview.innerHTML = `<span>📎</span><strong>${escapeHtml(file.name)}</strong><small>${Math.ceil(file.size / 1024)} KB</small><button type="button" class="remove-attachment" aria-label="Remove attachment">×</button>`;
+  preview.querySelector(".remove-attachment").addEventListener("click", () => {
+    selectedFile = null;
+    preview.hidden = true;
+    preview.innerHTML = "";
+    $("#fileInput").value = "";
+  });
+  input.focus();
 });
 renderHistory();
