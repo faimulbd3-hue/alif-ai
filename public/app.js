@@ -38,7 +38,7 @@ function addMessage(role, text) {
   const node = document.createElement("div"); node.className = `message ${role}`;
   node.innerHTML = `<div class="message-avatar">${role === "user" ? "F" : "A"}</div><div class="message-bubble"></div>`;
   const bubble = node.querySelector(".message-bubble");
-  if (role === "assistant" && (text.includes("```") || /^\s*<!doctype html[\s>]|^\s*<html[\s>]/i.test(text))) {
+  if (role === "assistant") {
     bubble.innerHTML = renderReply(text);
     bubble.querySelectorAll(".copy-code").forEach((button) => button.addEventListener("click", async () => {
       const code = bubble.querySelectorAll(".code-box")[Number(button.dataset.codeId.split("-")[1])]?.querySelector("code")?.textContent || "";
