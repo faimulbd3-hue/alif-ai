@@ -18,9 +18,9 @@ function escapeHtml(value) {
 }
 function renderReply(text) {
   const codeBlocks = [];
-  const withoutCode = text.replace(/```([\w-]*)\n?([\s\S]*?)```/g, (_match, language, code) => {
+  const withoutCode = text.replace(/```([^\r\n`]*)\r?\n([\s\S]*?)```/g, (_match, language, code) => {
     const id = `code-${codeBlocks.length}`;
-    codeBlocks.push({ id, language: language.toLowerCase(), code: code.trim() });
+    codeBlocks.push({ id, language: language.trim().toLowerCase(), code: code.trim() });
     return `\u0000${id}\u0000`;
   });
   return withoutCode.split(/\u0000(code-\d+)\u0000/).map((part) => {
@@ -39,7 +39,14 @@ function addMessage(role, text) {
     bubble.innerHTML = renderReply(text);
     bubble.querySelectorAll(".copy-code").forEach((button) => button.addEventListener("click", async () => {
       const code = bubble.querySelectorAll(".code-box")[Number(button.dataset.codeId.split("-")[1])]?.querySelector("code")?.textContent || "";
-      await navigator.clipboard.writeText(code); button.textContent = "Copied";
+      try {
+        await navigator.clipboard.writeText(code);
+      } catch {
+        const area = document.createElement("textarea");
+        area.value = code; document.body.appendChild(area); area.select();
+        document.execCommand("copy"); area.remove();
+      }
+      button.textContent = "Copied";
       setTimeout(() => { button.textContent = "Copy"; }, 1600);
     }));
     bubble.querySelectorAll(".preview-code").forEach((button) => button.addEventListener("click", () => {
@@ -73,7 +80,7 @@ async function sendMessage(text) {
     const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, history: context }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || `Server error (${response.status})`);
-    const reply = data.reply || "কোনো উত্তর পাওয়া যায়নি।";
+    const reply = data.reply || data.response || "কোনো উত্তর পাওয়া যায়নি।";
     history.at(-1).messages.push({ role: "assistant", content: reply });
     saveHistory();
     hideGenerating(); addMessage("assistant", reply); if (data.mode === "demo") toast("Demo mode — API key যোগ করুন");
