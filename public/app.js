@@ -146,7 +146,6 @@ async function sendMessage(text) {
       $("#attachmentPreview").innerHTML = "";
       input.value = "";
       input.style.height = "auto";
-      await loadFiles();
       const question = message || `এই ফাইলটি সংক্ষেপে বিশ্লেষণ করো: ${uploadResult.name}`;
       selectedFile = null;
       const context = history.flatMap((item) => item.messages || []).slice(-12);
