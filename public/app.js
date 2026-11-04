@@ -4,6 +4,7 @@ const welcome = $("#welcome");
 const input = $("#messageInput");
 const chatHistory = $("#chatHistory");
 let history = JSON.parse(localStorage.getItem("alif-history") || "[]");
+let activeTool = "assistant";
 
 function toast(text) {
   const node = $("#toast"); node.textContent = text; node.classList.add("show");
@@ -89,9 +90,30 @@ function hideGenerating() {
   const node = messages.querySelector(".generating");
   if (node) node.remove();
 }
+async function searchWeb(query) {
+  showGenerating();
+  try {
+    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `Server error (${response.status})`);
+    const lines = [`Search results for: ${data.query}`];
+    if (data.answer) lines.push(`\n${data.answer}${data.source ? `\nSource: ${data.source}` : ""}`);
+    if (data.results?.length) {
+      lines.push("\nRelated results:");
+      data.results.forEach((result, index) => lines.push(`${index + 1}. ${result.text}${result.url ? `\n   ${result.url}` : ""}`));
+    }
+    if (lines.length === 1) lines.push("\nNo instant results found. Try a more specific query.");
+    hideGenerating();
+    addMessage("assistant", lines.join("\n"));
+  } catch (error) {
+    hideGenerating();
+    addMessage("assistant", `দুঃখিত, ${error.message}`);
+  }
+}
 async function sendMessage(text) {
   const message = (text || input.value).trim(); if (!message) return;
   input.value = ""; input.style.height = "auto"; addMessage("user", message);
+  if (activeTool === "search") return searchWeb(message);
   history.push({ title: message.slice(0, 38), messages: [{ role: "user", content: message }] }); saveHistory();
   const button = $(".send-button"); button.disabled = true; button.textContent = "…";
   showGenerating();
@@ -129,6 +151,7 @@ document.querySelectorAll(".nav-link").forEach((button) => button.addEventListen
   document.querySelectorAll(".nav-link").forEach((item) => item.classList.remove("active"));
   button.classList.add("active");
   const tool = button.dataset.tool;
+  activeTool = tool;
   if (tool === "files") return $("#fileInput").click();
   if (tool === "coding") {
     input.placeholder = "Describe the code or bug you want help with...";
@@ -149,6 +172,7 @@ $("#themeToggle").addEventListener("click", () => { document.body.classList.togg
 if (localStorage.getItem("alif-theme") === "dark") document.body.classList.add("dark");
 $("#menuToggle").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
 $("#searchButton").addEventListener("click", () => {
+  activeTool = "search";
   input.placeholder = "What would you like to search?";
   input.focus();
   toast("Search mode selected — type your question");

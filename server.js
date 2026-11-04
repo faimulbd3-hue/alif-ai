@@ -116,6 +116,29 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
+app.get("/api/search", async (req, res) => {
+  const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (!query) return res.status(400).json({ error: "Search query লিখুন।" });
+  try {
+    const response = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
+    const data = await response.json();
+    const topics = (data.RelatedTopics || [])
+      .flatMap((topic) => topic.Topics || topic)
+      .filter((topic) => topic && topic.Text)
+      .slice(0, 6)
+      .map((topic) => ({ title: topic.Text.split(" - ")[0], text: topic.Text, url: topic.FirstURL }));
+    res.json({
+      query,
+      answer: data.AbstractText || data.Answer || "",
+      source: data.AbstractSource || "DuckDuckGo",
+      sourceUrl: data.AbstractURL || "",
+      results: topics
+    });
+  } catch (error) {
+    res.status(502).json({ error: "Web Search service-এর সঙ্গে সংযোগ করা যাচ্ছে না।" });
+  }
+});
+
 app.post("/api/upload", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "কোনো ফাইল পাওয়া যায়নি।" });
   res.json({
