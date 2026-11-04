@@ -134,21 +134,25 @@ async function searchWeb(query) {
 async function sendMessage(text) {
   const message = (text || input.value).trim(); if (!message && !selectedFile) return;
   if (selectedFile) {
+    const fileToUpload = selectedFile;
     try {
       const uploadData = new FormData();
-      uploadData.append("file", selectedFile);
+      uploadData.append("file", fileToUpload);
       const uploadResponse = await fetch("/api/upload", { method: "POST", body: uploadData });
       const uploadResult = await uploadResponse.json();
       if (!uploadResponse.ok) throw new Error(uploadResult.error || "ফাইল upload হয়নি।");
-      addMessage("user", `📎 ${uploadResult.name}\n${Math.ceil(uploadResult.size / 1024)} KB\n\n${message}`);
       selectedFile = null;
       $("#attachmentPreview").hidden = true;
       $("#attachmentPreview").innerHTML = "";
       input.value = "";
       input.style.height = "auto";
       const question = message || `এই ফাইলটি সংক্ষেপে বিশ্লেষণ করো: ${uploadResult.name}`;
-      selectedFile = null;
+      const attachmentMessage = `📎 ${uploadResult.name}\n${Math.ceil(uploadResult.size / 1024)} KB\n\n${question}`;
+      addMessage("user", attachmentMessage);
       const context = history.flatMap((item) => item.messages || []).slice(-12);
+      history.push({ title: question.slice(0, 38), messages: [{ role: "user", content: attachmentMessage }] });
+      saveHistory();
+      showGenerating();
       const chatResponse = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -156,7 +160,11 @@ async function sendMessage(text) {
       });
       const chatResult = await chatResponse.json().catch(() => ({}));
       if (!chatResponse.ok) throw new Error(chatResult.error || "ফাইল বিশ্লেষণ করা যায়নি।");
-      addMessage("assistant", chatResult.reply || chatResult.response || "ফাইল থেকে কোনো উত্তর পাওয়া যায়নি।");
+      const reply = chatResult.reply || chatResult.response || "ফাইল থেকে কোনো উত্তর পাওয়া যায়নি।";
+      history.at(-1).messages.push({ role: "assistant", content: reply });
+      saveHistory();
+      hideGenerating();
+      addMessage("assistant", reply);
       toast(`${uploadResult.name} বিশ্লেষণ করা হয়েছে`);
       return;
     } catch (error) {
