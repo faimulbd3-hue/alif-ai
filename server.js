@@ -75,6 +75,11 @@ function getConfiguredProvider(name) {
   return { name, ...config };
 }
 
+function getOpenRouterKeys() {
+  return [process.env.OPENROUTER_API_KEY, process.env.OPENROUTER_API_KEY_2]
+    .filter((key, index, keys) => key && keys.indexOf(key) === index);
+}
+
 async function requestChat(provider, key, model, messages) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 90000);
@@ -119,7 +124,7 @@ app.post("/api/chat", async (req, res) => {
   }
 
   const provider = getProvider();
-  const apiKey = provider && process.env[provider.key];
+  const apiKey = provider && (provider.name === "openrouter" ? getOpenRouterKeys()[0] : process.env[provider.key]);
   if (!provider || !apiKey) {
     return res.json({ reply: demoReply(message.trim()), mode: "demo" });
   }
@@ -137,6 +142,17 @@ app.post("/api/chat", async (req, res) => {
     let activeModel = model || process.env[provider.model] || provider.defaultModel;
     let result = await requestChat(activeProvider, activeKey, activeModel, messages);
     let { response, data } = result;
+    if (!response.ok && provider.name === "openrouter" && [402, 403, 429].includes(response.status)) {
+      const keys = getOpenRouterKeys();
+      for (const backupKey of keys.slice(1)) {
+        result = await requestChat(provider, backupKey, activeModel, messages);
+        ({ response, data } = result);
+        if (response.ok) {
+          activeKey = backupKey;
+          break;
+        }
+      }
+    }
     const shouldFallback = provider.name === "openrouter" && [402, 403, 429].includes(response.status);
     const fallbackProvider = getConfiguredProvider("cloudflare");
     if (!response.ok && shouldFallback && fallbackProvider && process.env.CLOUDFLARE_ACCOUNT_ID) {
