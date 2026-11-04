@@ -13,9 +13,14 @@ if (fs.existsSync(envPath)) {
 
 const app = express();
 const uploadDirectory = path.join(__dirname, "uploads");
+const fileIndexPath = path.join(uploadDirectory, "files.json");
 fs.mkdirSync(uploadDirectory, { recursive: true });
 const upload = multer({ dest: uploadDirectory });
 const port = process.env.PORT || 3000;
+const readFileIndex = () => {
+  try { return JSON.parse(fs.readFileSync(fileIndexPath, "utf8")); } catch { return []; }
+};
+const writeFileIndex = (files) => fs.writeFileSync(fileIndexPath, JSON.stringify(files, null, 2));
 
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public"), {
@@ -158,11 +163,25 @@ app.get("/api/search", async (req, res) => {
 
 app.post("/api/upload", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "কোনো ফাইল পাওয়া যায়নি।" });
+  const files = readFileIndex();
+  files.push({ id: req.file.filename, name: req.file.originalname, size: req.file.size, uploadedAt: new Date().toISOString() });
+  writeFileIndex(files);
   res.json({
+    id: req.file.filename,
     name: req.file.originalname,
     size: req.file.size,
     message: `${req.file.originalname} আপলোড হয়েছে। PDF/image analysis pipeline-এ পাঠানোর জন্য প্রস্তুত।`
   });
+});
+app.get("/api/files", (_req, res) => res.json({ files: readFileIndex().reverse() }));
+app.delete("/api/files/:id", (req, res) => {
+  const files = readFileIndex();
+  const file = files.find((item) => item.id === req.params.id);
+  if (!file) return res.status(404).json({ error: "ফাইল পাওয়া যায়নি।" });
+  const filePath = path.join(uploadDirectory, file.id);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  writeFileIndex(files.filter((item) => item.id !== file.id));
+  res.json({ ok: true });
 });
 
 app.get("/api/health", (_req, res) => res.json({ status: "ok", assistant: "Alif AI" }));

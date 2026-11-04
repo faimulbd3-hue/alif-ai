@@ -3,6 +3,7 @@ const messages = $("#messages");
 const welcome = $("#welcome");
 const input = $("#messageInput");
 const chatHistory = $("#chatHistory");
+const filesPanel = $("#filesPanel");
 let history = JSON.parse(localStorage.getItem("alif-history") || "[]");
 let activeTool = "assistant";
 
@@ -90,6 +91,25 @@ function hideGenerating() {
   const node = messages.querySelector(".generating");
   if (node) node.remove();
 }
+async function loadFiles() {
+  filesPanel.hidden = false;
+  filesPanel.innerHTML = `<div class="files-title"><strong>Files & Documents</strong><button class="file-refresh">Refresh</button></div><input class="file-search" placeholder="Search uploaded files..." /><div class="file-list">Loading files...</div>`;
+  try {
+    const response = await fetch("/api/files");
+    const data = await response.json();
+    const render = (filter = "") => {
+      const files = data.files.filter((file) => file.name.toLowerCase().includes(filter.toLowerCase()));
+      filesPanel.querySelector(".file-list").innerHTML = files.length ? files.map((file) => `<div class="file-row"><span>▣</span><div><b>${escapeHtml(file.name)}</b><small>${Math.ceil(file.size / 1024)} KB</small></div><button class="file-delete" data-file-id="${file.id}">×</button></div>`).join("") : "<p class=\"empty-files\">কোনো file পাওয়া যায়নি।</p>";
+    };
+    render();
+    filesPanel.querySelector(".file-search").addEventListener("input", (event) => render(event.target.value));
+    filesPanel.querySelector(".file-refresh").addEventListener("click", loadFiles);
+    filesPanel.querySelectorAll(".file-delete").forEach((button) => button.addEventListener("click", async () => {
+      await fetch(`/api/files/${encodeURIComponent(button.dataset.fileId)}`, { method: "DELETE" });
+      loadFiles();
+    }));
+  } catch (error) { filesPanel.querySelector(".file-list").textContent = `ফাইল লোড করা যায়নি: ${error.message}`; }
+}
 async function searchWeb(query) {
   showGenerating();
   try {
@@ -152,7 +172,7 @@ document.querySelectorAll(".nav-link").forEach((button) => button.addEventListen
   button.classList.add("active");
   const tool = button.dataset.tool;
   activeTool = tool;
-  if (tool === "files") return $("#fileInput").click();
+  if (tool === "files") return loadFiles();
   if (tool === "coding") {
     input.placeholder = "Describe the code or bug you want help with...";
     input.value = "Help me debug this code step by step: ";
@@ -182,7 +202,7 @@ $("#fileButton").addEventListener("click", () => $("#fileInput").click());
 $("#fileInput").addEventListener("change", async (event) => {
   const file = event.target.files[0]; if (!file) return;
   const data = new FormData(); data.append("file", file);
-  try { const response = await fetch("/api/upload", { method: "POST", body: data }); const result = await response.json(); if (!response.ok) throw new Error(result.error); toast(result.message); }
+  try { const response = await fetch("/api/upload", { method: "POST", body: data }); const result = await response.json(); if (!response.ok) throw new Error(result.error); toast(result.message); await loadFiles(); }
   catch (error) { toast(error.message); }
 });
 renderHistory();
