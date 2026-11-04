@@ -18,7 +18,10 @@ function escapeHtml(value) {
 }
 function renderReply(text) {
   const codeBlocks = [];
-  const withoutCode = text.replace(/```([^\r\n`]*)\r?\n([\s\S]*?)```/g, (_match, language, code) => {
+  const source = /^\s*<!doctype html[\s>]|^\s*<html[\s>]/i.test(text) && !text.includes("```")
+    ? `\`\`\`html\n${text.trim()}\n\`\`\``
+    : text;
+  const withoutCode = source.replace(/```([^\r\n`]*)\r?\n?([\s\S]*?)```/g, (_match, language, code) => {
     const id = `code-${codeBlocks.length}`;
     codeBlocks.push({ id, language: language.trim().toLowerCase(), code: code.trim() });
     return `\u0000${id}\u0000`;
@@ -35,7 +38,7 @@ function addMessage(role, text) {
   const node = document.createElement("div"); node.className = `message ${role}`;
   node.innerHTML = `<div class="message-avatar">${role === "user" ? "F" : "A"}</div><div class="message-bubble"></div>`;
   const bubble = node.querySelector(".message-bubble");
-  if (role === "assistant" && text.includes("```")) {
+  if (role === "assistant" && (text.includes("```") || /^\s*<!doctype html[\s>]|^\s*<html[\s>]/i.test(text))) {
     bubble.innerHTML = renderReply(text);
     bubble.querySelectorAll(".copy-code").forEach((button) => button.addEventListener("click", async () => {
       const code = bubble.querySelectorAll(".code-box")[Number(button.dataset.codeId.split("-")[1])]?.querySelector("code")?.textContent || "";
