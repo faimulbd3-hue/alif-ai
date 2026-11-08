@@ -181,18 +181,26 @@ body {
 
 #profileMenu {
   display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  animation: none !important;
 }
 
+#profileMenu[data-open="false"],
 #profileMenu[aria-hidden="true"] {
   display: none !important;
   visibility: hidden !important;
+  opacity: 0 !important;
   pointer-events: none !important;
 }
 
-#profileMenu.open[aria-hidden="false"] {
+#profileMenu[data-open="true"].open[aria-hidden="false"] {
   display: block !important;
   visibility: visible;
+  opacity: 1 !important;
   pointer-events: auto;
+  animation: dropdown-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .modal-backdrop:not([hidden]) {
