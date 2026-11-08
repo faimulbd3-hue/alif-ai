@@ -344,6 +344,11 @@ profileButton.addEventListener("click", (event) => {
   const shouldOpen = profileMenu.getAttribute("aria-hidden") !== "false";
   setProfileMenu(shouldOpen);
 });
+$("#profileMenuClose").addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  closeProfileMenu();
+});
 profileMenu.addEventListener("click", (event) => {
   const action = event.target.closest("[data-profile-action]")?.dataset.profileAction;
   if (!action) return;

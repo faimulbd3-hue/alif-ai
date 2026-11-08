@@ -185,6 +185,7 @@ body {
   opacity: 0 !important;
   pointer-events: none !important;
   animation: none !important;
+  transform: translateY(6px) scale(0.98);
 }
 
 #profileMenu[data-open="false"],
@@ -200,7 +201,30 @@ body {
   visibility: visible;
   opacity: 1 !important;
   pointer-events: auto;
-  animation: dropdown-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform: translateY(0) scale(1);
+}
+
+.profile-menu-close {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  .profile-menu-close {
+    display: block !important;
+    position: absolute;
+    top: 4px;
+    right: 5px;
+    width: 25px;
+    height: 25px;
+    padding: 0 !important;
+    text-align: center !important;
+    color: var(--muted) !important;
+    font-size: 19px !important;
+  }
+
+  .profile-menu {
+    padding-top: 34px !important;
+  }
 }
 
 .modal-backdrop:not([hidden]) {
