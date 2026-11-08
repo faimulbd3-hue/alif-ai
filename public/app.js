@@ -239,11 +239,17 @@ $("#sidebarOverlay").addEventListener("click", closeSidebar);
 document.querySelectorAll(".nav-link, .new-chat, .chat-open").forEach((button) => button.addEventListener("click", closeSidebar));
 const profileButton = $("#profileButton");
 const profileMenu = $("#profileMenu");
+const closeProfileMenu = () => {
+  profileMenu.hidden = true;
+  profileMenu.classList.remove("open");
+  profileButton.setAttribute("aria-expanded", "false");
+};
 profileButton.addEventListener("click", (event) => {
   event.stopPropagation();
-  const isOpen = !profileMenu.hidden;
-  profileMenu.hidden = isOpen;
-  profileButton.setAttribute("aria-expanded", String(!isOpen));
+  const shouldOpen = profileMenu.hidden;
+  profileMenu.hidden = !shouldOpen;
+  profileMenu.classList.toggle("open", shouldOpen);
+  profileButton.setAttribute("aria-expanded", String(shouldOpen));
 });
 profileMenu.addEventListener("click", (event) => {
   const action = event.target.closest("[data-profile-action]")?.dataset.profileAction;
@@ -251,20 +257,15 @@ profileMenu.addEventListener("click", (event) => {
   if (action === "theme") $("#themeToggle").click();
   if (action === "settings") toast("Settings শিগগিরই আসছে");
   if (action === "logout") toast("Sign out-এর জন্য login system প্রয়োজন");
-  profileMenu.hidden = true;
-  profileButton.setAttribute("aria-expanded", "false");
+  closeProfileMenu();
 });
 document.addEventListener("click", (event) => {
-  if (!event.target.closest(".profile-wrap")) {
-    profileMenu.hidden = true;
-    profileButton.setAttribute("aria-expanded", "false");
-  }
+  if (!event.target.closest(".profile-wrap")) closeProfileMenu();
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeSidebar();
-    profileMenu.hidden = true;
-    profileButton.setAttribute("aria-expanded", "false");
+    closeProfileMenu();
   }
 });
 $("#searchButton").addEventListener("click", () => {
