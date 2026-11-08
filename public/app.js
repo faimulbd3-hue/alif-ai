@@ -7,10 +7,30 @@ const filesPanel = $("#filesPanel");
 let history = JSON.parse(localStorage.getItem("alif-history") || "[]");
 let activeTool = "assistant";
 let selectedFile = null;
+let isAuthMode = false;
 
 function toast(text) {
   const node = $("#toast"); node.textContent = text; node.classList.add("show");
   setTimeout(() => node.classList.remove("show"), 2800);
+}
+function openModal(id) { const modal = $(`#${id}`); modal.hidden = false; modal.querySelector("input")?.focus(); }
+function closeModal(id) { $(`#${id}`).hidden = true; }
+function updateProfile() {
+  const user = JSON.parse(localStorage.getItem("alif-user") || "null");
+  $("#profileName").textContent = user?.name || "Guest";
+  $("#profilePlan").textContent = user ? "Free plan" : "Not signed in";
+  document.querySelector('[data-profile-action="login"]').hidden = Boolean(user);
+  document.querySelector('[data-profile-action="logout"]').hidden = !user;
+}
+function showAuth(mode = "login") {
+  isAuthMode = mode === "login";
+  $("#authTitle").textContent = isAuthMode ? "Sign in to Alif AI" : "Create your Alif AI account";
+  $("#authSubtitle").textContent = isAuthMode ? "Sign in on this device to keep your profile." : "Create a local account to personalize this device.";
+  $("#authName").hidden = isAuthMode;
+  $("#authName").required = !isAuthMode;
+  $("#authForm button[type=submit]").textContent = isAuthMode ? "Sign in" : "Create account";
+  $("#authSwitch").textContent = isAuthMode ? "New here? Create an account" : "Already have an account? Sign in";
+  openModal("authModal");
 }
 function saveHistory() { localStorage.setItem("alif-history", JSON.stringify(history)); renderHistory(); }
 function renderHistory() {
@@ -255,10 +275,42 @@ profileMenu.addEventListener("click", (event) => {
   const action = event.target.closest("[data-profile-action]")?.dataset.profileAction;
   if (!action) return;
   if (action === "theme") $("#themeToggle").click();
-  if (action === "settings") toast("Settings শিগগিরই আসছে");
-  if (action === "logout") toast("Sign out-এর জন্য login system প্রয়োজন");
+  if (action === "login") showAuth("login");
+  if (action === "settings") {
+    $("#settingsTheme").checked = document.body.classList.contains("dark");
+    openModal("settingsModal");
+  }
+  if (action === "logout") {
+    localStorage.removeItem("alif-user");
+    updateProfile();
+    toast("আপনি sign out করেছেন");
+  }
   closeProfileMenu();
 });
+$("#authForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const email = $("#authEmail").value.trim();
+  const password = $("#authPassword").value;
+  const saved = JSON.parse(localStorage.getItem("alif-user") || "null");
+  if (isAuthMode) {
+    if (!saved || saved.email !== email || saved.password !== password) return toast("Email বা password সঠিক নয়");
+    localStorage.setItem("alif-user", JSON.stringify({ name: saved.name, email: saved.email }));
+  } else {
+    localStorage.setItem("alif-user", JSON.stringify({ name: $("#authName").value.trim(), email, password }));
+  }
+  updateProfile();
+  closeModal("authModal");
+  $("#authForm").reset();
+  toast(isAuthMode ? "Sign in সফল হয়েছে" : "Account তৈরি হয়েছে");
+});
+$("#authSwitch").addEventListener("click", () => showAuth(isAuthMode ? "register" : "login"));
+document.querySelectorAll("[data-close-modal]").forEach((button) => button.addEventListener("click", () => closeModal(button.dataset.closeModal)));
+document.querySelectorAll(".modal-backdrop").forEach((modal) => modal.addEventListener("click", (event) => { if (event.target === modal) closeModal(modal.id); }));
+$("#settingsTheme").addEventListener("change", (event) => {
+  document.body.classList.toggle("dark", event.target.checked);
+  localStorage.setItem("alif-theme", event.target.checked ? "dark" : "light");
+});
+$("#clearHistory").addEventListener("click", () => { history = []; saveHistory(); messages.innerHTML = ""; messages.style.display = "none"; welcome.style.display = "block"; toast("Chat history cleared"); });
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".profile-wrap")) closeProfileMenu();
 });
@@ -266,6 +318,8 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeSidebar();
     closeProfileMenu();
+    closeModal("authModal");
+    closeModal("settingsModal");
   }
 });
 $("#searchButton").addEventListener("click", () => {
@@ -291,3 +345,4 @@ $("#fileInput").addEventListener("change", (event) => {
   input.focus();
 });
 renderHistory();
+updateProfile();
