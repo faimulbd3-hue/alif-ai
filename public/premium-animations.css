@@ -179,15 +179,18 @@ body {
   animation: dropdown-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-#profileMenu[hidden],
+#profileMenu {
+  display: none !important;
+}
+
 #profileMenu[aria-hidden="true"] {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
 }
 
-#profileMenu.open:not([hidden])[aria-hidden="false"] {
-  display: block;
+#profileMenu.open[aria-hidden="false"] {
+  display: block !important;
   visibility: visible;
   pointer-events: auto;
 }

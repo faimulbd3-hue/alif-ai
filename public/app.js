@@ -329,9 +329,8 @@ document.querySelectorAll(".nav-link, .new-chat, .chat-open").forEach((button) =
 const profileButton = $("#profileButton");
 const profileMenu = $("#profileMenu");
 const setProfileMenu = (open) => {
-  profileMenu.hidden = !open;
+  profileMenu.hidden = false;
   profileMenu.setAttribute("aria-hidden", String(!open));
-  profileMenu.style.setProperty("display", open ? "block" : "none", "important");
   profileMenu.classList.toggle("open", open);
   profileButton.setAttribute("aria-expanded", String(open));
 };
