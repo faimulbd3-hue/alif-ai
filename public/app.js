@@ -9,6 +9,7 @@ let activeTool = "assistant";
 let selectedFile = null;
 let isAuthMode = false;
 let authToken = localStorage.getItem("alif-access-token") || "";
+let activeChatIndex = null;
 const apiHeaders = () => authToken ? { Authorization: `Bearer ${authToken}` } : {};
 
 function toast(text) {
@@ -55,7 +56,9 @@ async function loadCloudHistory() {
   const data = await response.json();
   if (Array.isArray(data.history) && data.history.length) {
     history = data.history;
+    activeChatIndex = history.length - 1;
     localStorage.setItem("alif-history", JSON.stringify(history));
+    activeChatIndex = history.length ? history.length - 1 : null;
     renderHistory();
   }
 }
@@ -65,9 +68,24 @@ function renderHistory() {
     return `<div class="chat-item" data-history-index="${index}"><button class="chat-open"><span>✦</span>${escapeHtml(item.title)}</button><button class="chat-delete" aria-label="Delete chat" title="Delete chat">×</button></div>`;
   }).join("");
 }
+function startChat() {
+  activeChatIndex = null;
+  messages.innerHTML = "";
+  messages.style.display = "none";
+  welcome.style.display = "block";
+  input.focus();
+}
+function ensureActiveChat(title) {
+  if (activeChatIndex !== null && history[activeChatIndex]) return history[activeChatIndex];
+  const chat = { title: title.slice(0, 38), messages: [] };
+  history.push(chat);
+  activeChatIndex = history.length - 1;
+  return chat;
+}
 function loadChat(index) {
   const chat = history[index];
   if (!chat) return;
+  activeChatIndex = index;
   messages.innerHTML = "";
   welcome.style.display = "none";
   messages.style.display = "flex";
@@ -194,9 +212,10 @@ async function sendMessage(text) {
       input.style.height = "auto";
       const question = message || `এই ফাইলটি সংক্ষেপে বিশ্লেষণ করো: ${uploadResult.name}`;
       const attachmentMessage = `📎 ${uploadResult.name}\n${Math.ceil(uploadResult.size / 1024)} KB\n\n${question}`;
+      const chat = ensureActiveChat(question);
+      const context = chat.messages.slice(-12);
+      chat.messages.push({ role: "user", content: attachmentMessage });
       addMessage("user", attachmentMessage);
-      const context = history.flatMap((item) => item.messages || []).slice(-12);
-      history.push({ title: question.slice(0, 38), messages: [{ role: "user", content: attachmentMessage }] });
       saveHistory();
       showGenerating();
       const chatResponse = await fetch("/api/chat", {
@@ -207,7 +226,7 @@ async function sendMessage(text) {
       const chatResult = await chatResponse.json().catch(() => ({}));
       if (!chatResponse.ok) throw new Error(chatResult.error || "ফাইল বিশ্লেষণ করা যায়নি।");
       const reply = chatResult.reply || chatResult.response || "ফাইল থেকে কোনো উত্তর পাওয়া যায়নি।";
-      history.at(-1).messages.push({ role: "assistant", content: reply });
+      chat.messages.push({ role: "assistant", content: reply });
       saveHistory();
       hideGenerating();
       addMessage("assistant", reply);
@@ -220,16 +239,18 @@ async function sendMessage(text) {
   }
   input.value = ""; input.style.height = "auto"; addMessage("user", message);
   if (activeTool === "search") return searchWeb(message);
-  history.push({ title: message.slice(0, 38), messages: [{ role: "user", content: message }] }); saveHistory();
+  const chat = ensureActiveChat(message);
+  const context = chat.messages.slice(-12);
+  chat.messages.push({ role: "user", content: message });
+  saveHistory();
   const button = $(".send-button"); button.disabled = true; button.textContent = "…";
   showGenerating();
   try {
-    const context = history.flatMap((item) => item.messages || []).slice(0, -1).slice(-12);
     const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, history: context }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || `Server error (${response.status})`);
     const reply = data.reply || data.response || "কোনো উত্তর পাওয়া যায়নি।";
-    history.at(-1).messages.push({ role: "assistant", content: reply });
+    chat.messages.push({ role: "assistant", content: reply });
     saveHistory();
     hideGenerating(); addMessage("assistant", reply);
     if (data.fallback) toast("OpenRouter limit শেষ — Cloudflare Workers AI ব্যবহার করা হয়েছে");
@@ -240,17 +261,16 @@ async function sendMessage(text) {
 $("#chatForm").addEventListener("submit", (event) => { event.preventDefault(); sendMessage(); });
 input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 120)}px`; });
 document.querySelectorAll("[data-prompt]").forEach((button) => button.addEventListener("click", () => sendMessage(button.dataset.prompt)));
-$("#newChat").addEventListener("click", () => { messages.innerHTML = ""; messages.style.display = "none"; welcome.style.display = "block"; input.focus(); });
+$("#newChat").addEventListener("click", startChat);
 chatHistory.addEventListener("click", (event) => {
   const item = event.target.closest(".chat-item");
   if (!item) return;
   const index = Number(item.dataset.historyIndex);
   if (event.target.closest(".chat-delete")) {
     history.splice(index, 1);
+    if (activeChatIndex === index) startChat();
+    else if (activeChatIndex !== null && activeChatIndex > index) activeChatIndex -= 1;
     saveHistory();
-    messages.innerHTML = "";
-    messages.style.display = "none";
-    welcome.style.display = "block";
     return;
   }
   if (event.target.closest(".chat-open")) loadChat(index);
@@ -329,7 +349,7 @@ $("#authForm").addEventListener("submit", (event) => {
     if (!data.session?.access_token) {
       closeModal("authModal");
       $("#authForm").reset();
-      return toast("Account তৈরি হয়েছে। Email verify করে sign in করুন।");
+      return toast(data.message || "Account তৈরি হয়েছে। Email verify করে sign in করুন।");
     }
     authToken = data.session.access_token;
     localStorage.setItem("alif-access-token", authToken);

@@ -181,8 +181,19 @@ app.post("/api/auth/signup", async (req, res) => {
       method: "POST",
       body: JSON.stringify({ email, password, data: { name: String(name || "").trim() } })
     }, false);
-    if (!result.response.ok) return res.status(result.response.status).json({ error: result.data?.msg || result.data?.message || "Account তৈরি করা যায়নি।" });
-    res.status(201).json({ user: result.data.user || result.data, session: result.data.session || null, needsEmailConfirmation: !result.data.access_token });
+    if (!result.response.ok) return res.status(result.response.status).json({ error: result.data?.msg || result.data?.message || result.data?.error_description || "Account তৈরি করা যায়নি।" });
+    const session = result.data.session || (result.data.access_token ? {
+      access_token: result.data.access_token,
+      refresh_token: result.data.refresh_token,
+      expires_in: result.data.expires_in,
+      token_type: result.data.token_type
+    } : null);
+    res.status(201).json({
+      user: result.data.user || result.data,
+      session,
+      needsEmailConfirmation: !session?.access_token,
+      message: session?.access_token ? "Account তৈরি হয়েছে।" : "Account তৈরি হয়েছে। Email verify করে sign in করুন।"
+    });
   } catch (error) {
     res.status(502).json({ error: `Supabase signup error: ${error.message}` });
   }
@@ -197,7 +208,12 @@ app.post("/api/auth/login", async (req, res) => {
       method: "POST",
       body: JSON.stringify({ email, password })
     }, false);
-    if (!result.response.ok) return res.status(401).json({ error: result.data?.error_description || result.data?.msg || "Email বা password সঠিক নয়।" });
+    if (!result.response.ok) {
+      const error = result.data?.error_code === "email_not_confirmed"
+        ? "এই email এখনো verify হয়নি। Inbox বা Spam folder দেখুন, অথবা Supabase Auth-এ email confirmation বন্ধ করুন।"
+        : result.data?.error_description || result.data?.msg || "Email বা password সঠিক নয়।";
+      return res.status(401).json({ error });
+    }
     res.json({ session: result.data, user: result.data.user });
   } catch (error) {
     res.status(502).json({ error: `Supabase login error: ${error.message}` });
