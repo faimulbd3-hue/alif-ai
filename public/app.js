@@ -330,6 +330,8 @@ const profileButton = $("#profileButton");
 const profileMenu = $("#profileMenu");
 const setProfileMenu = (open) => {
   profileMenu.hidden = !open;
+  profileMenu.setAttribute("aria-hidden", String(!open));
+  profileMenu.style.setProperty("display", open ? "block" : "none", "important");
   profileMenu.classList.toggle("open", open);
   profileButton.setAttribute("aria-expanded", String(open));
 };
@@ -339,7 +341,7 @@ const closeProfileMenu = () => {
 setProfileMenu(false);
 profileButton.addEventListener("click", (event) => {
   event.stopPropagation();
-  const shouldOpen = profileMenu.hidden;
+  const shouldOpen = profileMenu.getAttribute("aria-hidden") !== "false";
   setProfileMenu(shouldOpen);
 });
 profileMenu.addEventListener("click", (event) => {
