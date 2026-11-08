@@ -259,6 +259,11 @@ async function sendMessage(text) {
   finally { button.disabled = false; button.textContent = "↑"; }
 }
 $("#chatForm").addEventListener("submit", (event) => { event.preventDefault(); sendMessage(); });
+input.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+  event.preventDefault();
+  if (!event.repeat) sendMessage();
+});
 input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 120)}px`; });
 document.querySelectorAll("[data-prompt]").forEach((button) => button.addEventListener("click", () => sendMessage(button.dataset.prompt)));
 $("#newChat").addEventListener("click", startChat);
