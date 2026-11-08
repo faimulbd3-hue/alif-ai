@@ -8,6 +8,8 @@ let history = JSON.parse(localStorage.getItem("alif-history") || "[]");
 let activeTool = "assistant";
 let selectedFile = null;
 let isAuthMode = false;
+let authToken = localStorage.getItem("alif-access-token") || "";
+const apiHeaders = () => authToken ? { Authorization: `Bearer ${authToken}` } : {};
 
 function toast(text) {
   const node = $("#toast"); node.textContent = text; node.classList.add("show");
@@ -15,24 +17,48 @@ function toast(text) {
 }
 function openModal(id) { const modal = $(`#${id}`); modal.hidden = false; modal.querySelector("input")?.focus(); }
 function closeModal(id) { $(`#${id}`).hidden = true; }
-function updateProfile() {
-  const user = JSON.parse(localStorage.getItem("alif-user") || "null");
-  $("#profileName").textContent = user?.name || "Guest";
+async function updateProfile() {
+  let user = null;
+  if (authToken) {
+    const response = await fetch("/api/auth/me", { headers: apiHeaders() });
+    if (response.ok) user = (await response.json()).user;
+    else { authToken = ""; localStorage.removeItem("alif-access-token"); }
+  }
+  $("#profileName").textContent = user?.user_metadata?.name || user?.email?.split("@")[0] || "Guest";
   $("#profilePlan").textContent = user ? "Free plan" : "Not signed in";
   document.querySelector('[data-profile-action="login"]').hidden = Boolean(user);
   document.querySelector('[data-profile-action="logout"]').hidden = !user;
+  return user;
 }
 function showAuth(mode = "login") {
   isAuthMode = mode === "login";
   $("#authTitle").textContent = isAuthMode ? "Sign in to Alif AI" : "Create your Alif AI account";
-  $("#authSubtitle").textContent = isAuthMode ? "Sign in on this device to keep your profile." : "Create a local account to personalize this device.";
+  $("#authSubtitle").textContent = isAuthMode ? "Sign in securely with your Supabase account." : "Create a secure Alif AI account.";
   $("#authName").hidden = isAuthMode;
   $("#authName").required = !isAuthMode;
   $("#authForm button[type=submit]").textContent = isAuthMode ? "Sign in" : "Create account";
   $("#authSwitch").textContent = isAuthMode ? "New here? Create an account" : "Already have an account? Sign in";
   openModal("authModal");
 }
-function saveHistory() { localStorage.setItem("alif-history", JSON.stringify(history)); renderHistory(); }
+function saveHistory() {
+  localStorage.setItem("alif-history", JSON.stringify(history));
+  renderHistory();
+  if (authToken) fetch("/api/history", {
+    method: "POST", headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ history })
+  }).catch(() => toast("Cloud history sync হয়নি"));
+}
+async function loadCloudHistory() {
+  if (!authToken) return;
+  const response = await fetch("/api/history", { headers: apiHeaders() });
+  if (!response.ok) return;
+  const data = await response.json();
+  if (Array.isArray(data.history) && data.history.length) {
+    history = data.history;
+    localStorage.setItem("alif-history", JSON.stringify(history));
+    renderHistory();
+  }
+}
 function renderHistory() {
   chatHistory.innerHTML = history.slice(-8).reverse().map((item) => {
     const index = history.indexOf(item);
@@ -116,7 +142,7 @@ async function loadFiles() {
   filesPanel.hidden = false;
   filesPanel.innerHTML = `<div class="files-title"><strong>Files & Documents</strong><button class="file-refresh">Refresh</button></div><input class="file-search" placeholder="Search uploaded files..." /><div class="file-list">Loading files...</div>`;
   try {
-    const response = await fetch("/api/files");
+    const response = await fetch("/api/files", { headers: apiHeaders() });
     const data = await response.json();
     const render = (filter = "") => {
       const files = data.files.filter((file) => file.name.toLowerCase().includes(filter.toLowerCase()));
@@ -126,7 +152,7 @@ async function loadFiles() {
     filesPanel.querySelector(".file-search").addEventListener("input", (event) => render(event.target.value));
     filesPanel.querySelector(".file-refresh").addEventListener("click", loadFiles);
     filesPanel.querySelectorAll(".file-delete").forEach((button) => button.addEventListener("click", async () => {
-      await fetch(`/api/files/${encodeURIComponent(button.dataset.fileId)}`, { method: "DELETE" });
+      await fetch(`/api/files/${encodeURIComponent(button.dataset.fileId)}`, { method: "DELETE", headers: apiHeaders() });
       loadFiles();
     }));
   } catch (error) { filesPanel.querySelector(".file-list").textContent = `ফাইল লোড করা যায়নি: ${error.message}`; }
@@ -158,7 +184,7 @@ async function sendMessage(text) {
     try {
       const uploadData = new FormData();
       uploadData.append("file", fileToUpload);
-      const uploadResponse = await fetch("/api/upload", { method: "POST", body: uploadData });
+      const uploadResponse = await fetch("/api/upload", { method: "POST", headers: apiHeaders(), body: uploadData });
       const uploadResult = await uploadResponse.json();
       if (!uploadResponse.ok) throw new Error(uploadResult.error || "ফাইল upload হয়নি।");
       selectedFile = null;
@@ -281,7 +307,8 @@ profileMenu.addEventListener("click", (event) => {
     openModal("settingsModal");
   }
   if (action === "logout") {
-    localStorage.removeItem("alif-user");
+    authToken = "";
+    localStorage.removeItem("alif-access-token");
     updateProfile();
     toast("আপনি sign out করেছেন");
   }
@@ -291,17 +318,27 @@ $("#authForm").addEventListener("submit", (event) => {
   event.preventDefault();
   const email = $("#authEmail").value.trim();
   const password = $("#authPassword").value;
-  const saved = JSON.parse(localStorage.getItem("alif-user") || "null");
-  if (isAuthMode) {
-    if (!saved || saved.email !== email || saved.password !== password) return toast("Email বা password সঠিক নয়");
-    localStorage.setItem("alif-user", JSON.stringify({ name: saved.name, email: saved.email }));
-  } else {
-    localStorage.setItem("alif-user", JSON.stringify({ name: $("#authName").value.trim(), email, password }));
-  }
-  updateProfile();
-  closeModal("authModal");
-  $("#authForm").reset();
-  toast(isAuthMode ? "Sign in সফল হয়েছে" : "Account তৈরি হয়েছে");
+  const endpoint = isAuthMode ? "/api/auth/login" : "/api/auth/signup";
+  fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, name: $("#authName").value.trim() })
+  }).then(async (response) => {
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Authentication failed");
+    if (!data.session?.access_token) {
+      closeModal("authModal");
+      $("#authForm").reset();
+      return toast("Account তৈরি হয়েছে। Email verify করে sign in করুন।");
+    }
+    authToken = data.session.access_token;
+    localStorage.setItem("alif-access-token", authToken);
+    await updateProfile();
+    await loadCloudHistory();
+    closeModal("authModal");
+    $("#authForm").reset();
+    toast(isAuthMode ? "Sign in সফল হয়েছে" : "Account তৈরি হয়েছে");
+  }).catch((error) => toast(error.message));
 });
 $("#authSwitch").addEventListener("click", () => showAuth(isAuthMode ? "register" : "login"));
 document.querySelectorAll("[data-close-modal]").forEach((button) => button.addEventListener("click", () => closeModal(button.dataset.closeModal)));
@@ -310,7 +347,11 @@ $("#settingsTheme").addEventListener("change", (event) => {
   document.body.classList.toggle("dark", event.target.checked);
   localStorage.setItem("alif-theme", event.target.checked ? "dark" : "light");
 });
-$("#clearHistory").addEventListener("click", () => { history = []; saveHistory(); messages.innerHTML = ""; messages.style.display = "none"; welcome.style.display = "block"; toast("Chat history cleared"); });
+$("#clearHistory").addEventListener("click", async () => {
+  history = []; saveHistory();
+  if (authToken) await fetch("/api/history", { method: "DELETE", headers: apiHeaders() });
+  messages.innerHTML = ""; messages.style.display = "none"; welcome.style.display = "block"; toast("Chat history cleared");
+});
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".profile-wrap")) closeProfileMenu();
 });
@@ -345,4 +386,4 @@ $("#fileInput").addEventListener("change", (event) => {
   input.focus();
 });
 renderHistory();
-updateProfile();
+updateProfile().then(loadCloudHistory);
