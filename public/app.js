@@ -328,17 +328,19 @@ $("#sidebarOverlay").addEventListener("click", closeSidebar);
 document.querySelectorAll(".nav-link, .new-chat, .chat-open").forEach((button) => button.addEventListener("click", closeSidebar));
 const profileButton = $("#profileButton");
 const profileMenu = $("#profileMenu");
-const closeProfileMenu = () => {
-  profileMenu.hidden = true;
-  profileMenu.classList.remove("open");
-  profileButton.setAttribute("aria-expanded", "false");
+const setProfileMenu = (open) => {
+  profileMenu.hidden = !open;
+  profileMenu.classList.toggle("open", open);
+  profileButton.setAttribute("aria-expanded", String(open));
 };
+const closeProfileMenu = () => {
+  setProfileMenu(false);
+};
+setProfileMenu(false);
 profileButton.addEventListener("click", (event) => {
   event.stopPropagation();
   const shouldOpen = profileMenu.hidden;
-  profileMenu.hidden = !shouldOpen;
-  profileMenu.classList.toggle("open", shouldOpen);
-  profileButton.setAttribute("aria-expanded", String(shouldOpen));
+  setProfileMenu(shouldOpen);
 });
 profileMenu.addEventListener("click", (event) => {
   const action = event.target.closest("[data-profile-action]")?.dataset.profileAction;

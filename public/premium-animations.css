@@ -179,6 +179,18 @@ body {
   animation: dropdown-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.profile-menu[hidden] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.profile-menu.open:not([hidden]) {
+  display: block;
+  visibility: visible;
+  pointer-events: auto;
+}
+
 .modal-backdrop:not([hidden]) {
   animation: fade-in 0.22s ease both;
 }
