@@ -24,8 +24,9 @@
         <div class="history-heading"><span>Recent chats</span><button id="historySearch" aria-label="Search chats">⌕</button></div>
         <div class="chat-history" id="chatHistory"></div>
         <div class="sidebar-bottom">
-          <button class="profile"><div class="avatar">F</div><span><strong>Faimul</strong><small>Free plan</small></span><b>•••</b></button>
+          <div class="profile-wrap"><button class="profile" id="profileButton" aria-expanded="false"><div class="avatar">F</div><span><strong>Faimul</strong><small>Free plan</small></span><b>•••</b></button><div class="profile-menu" id="profileMenu" hidden><button data-profile-action="settings">⚙ Settings</button><button data-profile-action="theme">☼ Toggle theme</button><button data-profile-action="logout">↪ Sign out</button></div></div>
         </div>
+        <button class="sidebar-overlay" id="sidebarOverlay" aria-label="Close menu"></button>
       </aside>
       <main class="main">
         <header class="topbar"><button class="icon-button mobile-only" id="menuToggle">☰</button><div class="breadcrumb"><span>Alif AI</span><b>/</b><strong>Assistant</strong></div><div class="top-actions"><button class="icon-button" id="themeToggle" aria-label="Toggle theme">☼</button><button class="upgrade">Upgrade <span>↗</span></button></div></header>

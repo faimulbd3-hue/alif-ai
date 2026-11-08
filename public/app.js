@@ -232,7 +232,41 @@ document.querySelectorAll(".nav-link").forEach((button) => button.addEventListen
 }));
 $("#themeToggle").addEventListener("click", () => { document.body.classList.toggle("dark"); localStorage.setItem("alif-theme", document.body.classList.contains("dark") ? "dark" : "light"); });
 if (localStorage.getItem("alif-theme") === "dark") document.body.classList.add("dark");
-$("#menuToggle").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+const sidebar = $("#sidebar");
+const closeSidebar = () => sidebar.classList.remove("open");
+$("#menuToggle").addEventListener("click", () => sidebar.classList.toggle("open"));
+$("#sidebarOverlay").addEventListener("click", closeSidebar);
+document.querySelectorAll(".nav-link, .new-chat, .chat-open").forEach((button) => button.addEventListener("click", closeSidebar));
+const profileButton = $("#profileButton");
+const profileMenu = $("#profileMenu");
+profileButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const isOpen = !profileMenu.hidden;
+  profileMenu.hidden = isOpen;
+  profileButton.setAttribute("aria-expanded", String(!isOpen));
+});
+profileMenu.addEventListener("click", (event) => {
+  const action = event.target.closest("[data-profile-action]")?.dataset.profileAction;
+  if (!action) return;
+  if (action === "theme") $("#themeToggle").click();
+  if (action === "settings") toast("Settings শিগগিরই আসছে");
+  if (action === "logout") toast("Sign out-এর জন্য login system প্রয়োজন");
+  profileMenu.hidden = true;
+  profileButton.setAttribute("aria-expanded", "false");
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".profile-wrap")) {
+    profileMenu.hidden = true;
+    profileButton.setAttribute("aria-expanded", "false");
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeSidebar();
+    profileMenu.hidden = true;
+    profileButton.setAttribute("aria-expanded", "false");
+  }
+});
 $("#searchButton").addEventListener("click", () => {
   activeTool = "search";
   input.placeholder = "What would you like to search?";
