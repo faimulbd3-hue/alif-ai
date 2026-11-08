@@ -16,6 +16,21 @@ function toast(text) {
   const node = $("#toast"); node.textContent = text; node.classList.add("show");
   setTimeout(() => node.classList.remove("show"), 2800);
 }
+function createParticles() {
+  const field = $("#particleField");
+  if (!field) return;
+  const fragment = document.createDocumentFragment();
+  for (let index = 0; index < 22; index += 1) {
+    const particle = document.createElement("i");
+    particle.style.setProperty("--x", `${Math.random() * 100}%`);
+    particle.style.setProperty("--y", `${Math.random() * 100}%`);
+    particle.style.setProperty("--size", `${Math.random() * 3 + 1}px`);
+    particle.style.setProperty("--delay", `${Math.random() * -12}s`);
+    particle.style.setProperty("--duration", `${Math.random() * 8 + 10}s`);
+    fragment.appendChild(particle);
+  }
+  field.appendChild(fragment);
+}
 function openModal(id) { const modal = $(`#${id}`); modal.hidden = false; modal.querySelector("input")?.focus(); }
 function closeModal(id) { $(`#${id}`).hidden = true; }
 async function updateProfile() {
@@ -114,7 +129,7 @@ function renderReply(text) {
 }
 function addMessage(role, text) {
   welcome.style.display = "none"; messages.style.display = "flex";
-  const node = document.createElement("div"); node.className = `message ${role}`;
+  const node = document.createElement("div"); node.className = `message ${role} message-enter`;
   node.innerHTML = `<div class="message-avatar">${role === "user" ? "F" : "A"}</div><div class="message-bubble"></div>`;
   const bubble = node.querySelector(".message-bubble");
   if (role === "assistant") {
@@ -147,8 +162,8 @@ function addMessage(role, text) {
 }
 function showGenerating() {
   const node = document.createElement("div");
-  node.className = "message assistant generating";
-  node.innerHTML = `<div class="message-avatar">A</div><div class="message-bubble"><span class="loading-dots"></span> Generating answer, please wait...</div>`;
+  node.className = "message assistant generating message-enter";
+  node.innerHTML = `<div class="message-avatar">A</div><div class="message-bubble skeleton-bubble"><span class="loading-dots"></span><span class="skeleton-line"></span><span class="skeleton-line short"></span></div>`;
   messages.appendChild(node);
   $(".conversation").scrollTop = $(".conversation").scrollHeight;
 }
@@ -413,5 +428,7 @@ $("#fileInput").addEventListener("change", (event) => {
   });
   input.focus();
 });
+createParticles();
+document.body.classList.add("page-ready");
 renderHistory();
 updateProfile().then(loadCloudHistory);
