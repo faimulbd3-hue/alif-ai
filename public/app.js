@@ -333,6 +333,7 @@ const setProfileMenu = (open) => {
   profileMenu.setAttribute("aria-hidden", String(!open));
   profileMenu.dataset.open = String(open);
   profileMenu.classList.toggle("open", open);
+  profileMenu.style.display = open ? "block" : "none";
   profileButton.setAttribute("aria-expanded", String(open));
 };
 const closeProfileMenu = () => {
