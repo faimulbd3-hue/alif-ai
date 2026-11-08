@@ -304,7 +304,10 @@ document.querySelectorAll(".nav-link").forEach((button) => button.addEventListen
 $("#themeToggle").addEventListener("click", () => { document.body.classList.toggle("dark"); localStorage.setItem("alif-theme", document.body.classList.contains("dark") ? "dark" : "light"); });
 if (localStorage.getItem("alif-theme") === "dark") document.body.classList.add("dark");
 const sidebar = $("#sidebar");
-const closeSidebar = () => sidebar.classList.remove("open");
+const closeSidebar = () => {
+  sidebar.classList.remove("open");
+  closeProfileMenu();
+};
 $("#menuToggle").addEventListener("click", () => sidebar.classList.toggle("open"));
 $("#sidebarOverlay").addEventListener("click", closeSidebar);
 document.querySelectorAll(".nav-link, .new-chat, .chat-open").forEach((button) => button.addEventListener("click", closeSidebar));
@@ -377,9 +380,9 @@ $("#clearHistory").addEventListener("click", async () => {
   if (authToken) await fetch("/api/history", { method: "DELETE", headers: apiHeaders() });
   messages.innerHTML = ""; messages.style.display = "none"; welcome.style.display = "block"; toast("Chat history cleared");
 });
-document.addEventListener("click", (event) => {
+document.addEventListener("pointerdown", (event) => {
   if (!event.target.closest(".profile-wrap")) closeProfileMenu();
-});
+}, true);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeSidebar();
