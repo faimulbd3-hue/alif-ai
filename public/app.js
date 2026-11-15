@@ -89,7 +89,7 @@ function loadChat(index) {
   messages.innerHTML = "";
   welcome.style.display = "none";
   messages.style.display = "flex";
-  chat.messages.forEach((item) => addMessage(item.role === "assistant" ? "assistant" : "user", item.content));
+  chat.messages.forEach((item) => addMessage(item.role === "assistant" ? "assistant" : "user", item.content, { animate: false }));
   chatHistory.querySelectorAll(".chat-item").forEach((item) => item.classList.toggle("active", Number(item.dataset.historyIndex) === index));
 }
 function escapeHtml(value) {
@@ -112,46 +112,97 @@ function renderReply(text) {
     return `<div class="code-box"><div class="code-toolbar"><span>${block.language || "code"}</span><div>${preview}<button class="code-action copy-code" data-code-id="${block.id}">Copy</button></div></div><pre><code>${escapeHtml(block.code)}</code></pre></div>`;
   }).join("");
 }
-function addMessage(role, text) {
-  welcome.style.display = "none"; messages.style.display = "flex";
-  const node = document.createElement("div"); node.className = `message ${role}`;
+
+function bindCodeActions(bubble) {
+  bubble.querySelectorAll(".copy-code").forEach((button) => button.addEventListener("click", async () => {
+    const code = bubble.querySelectorAll(".code-box")[Number(button.dataset.codeId.split("-")[1])]?.querySelector("code")?.textContent || "";
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {
+      const area = document.createElement("textarea");
+      area.value = code; document.body.appendChild(area); area.select();
+      document.execCommand("copy"); area.remove();
+    }
+    button.textContent = "Copied";
+    setTimeout(() => { button.textContent = "Copy"; }, 1600);
+  }));
+  bubble.querySelectorAll(".preview-code").forEach((button) => button.addEventListener("click", () => {
+    const code = bubble.querySelectorAll(".code-box")[Number(button.dataset.codeId.split("-")[1])]?.querySelector("code")?.textContent || "";
+    const previewUrl = URL.createObjectURL(new Blob([code], { type: "text/html" }));
+    const preview = document.createElement("a");
+    preview.href = previewUrl;
+    preview.target = "_blank";
+    preview.rel = "noopener";
+    preview.click();
+    setTimeout(() => URL.revokeObjectURL(previewUrl), 60000);
+  }));
+}
+
+function typeWriter(bubble, fullText, onDone) {
+  const hasCode = /```/.test(fullText) || /^\s*<!doctype html/i.test(fullText) || /^\s*<html/i.test(fullText);
+  if (hasCode || fullText.length > 1800) {
+    bubble.innerHTML = renderReply(fullText);
+    bindCodeActions(bubble);
+    if (onDone) onDone();
+    return;
+  }
+
+  bubble.classList.add("typing");
+  bubble.innerHTML = "";
+  const words = fullText.split(/(\s+)/);
+  let index = 0;
+  let accumulated = "";
+
+  const step = () => {
+    if (index >= words.length) {
+      bubble.classList.remove("typing");
+      bubble.innerHTML = renderReply(fullText);
+      bindCodeActions(bubble);
+      if (onDone) onDone();
+      return;
+    }
+    accumulated += words[index];
+    index += 1;
+    bubble.innerHTML = escapeHtml(accumulated).replace(/\n/g, "<br>");
+    const scroller = $(".conversation");
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
+    const delay = words[index - 1]?.trim() ? 28 + Math.random() * 22 : 8;
+    setTimeout(step, delay);
+  };
+  step();
+}
+
+function addMessage(role, text, options = {}) {
+  welcome.style.display = "none";
+  messages.style.display = "flex";
+  const node = document.createElement("div");
+  node.className = `message ${role}`;
   node.innerHTML = `<div class="message-avatar">${role === "user" ? "F" : "A"}</div><div class="message-bubble"></div>`;
   const bubble = node.querySelector(".message-bubble");
-  if (role === "assistant") {
-    bubble.innerHTML = renderReply(text);
-    bubble.querySelectorAll(".copy-code").forEach((button) => button.addEventListener("click", async () => {
-      const code = bubble.querySelectorAll(".code-box")[Number(button.dataset.codeId.split("-")[1])]?.querySelector("code")?.textContent || "";
-      try {
-        await navigator.clipboard.writeText(code);
-      } catch {
-        const area = document.createElement("textarea");
-        area.value = code; document.body.appendChild(area); area.select();
-        document.execCommand("copy"); area.remove();
-      }
-      button.textContent = "Copied";
-      setTimeout(() => { button.textContent = "Copy"; }, 1600);
-    }));
-    bubble.querySelectorAll(".preview-code").forEach((button) => button.addEventListener("click", () => {
-      const code = bubble.querySelectorAll(".code-box")[Number(button.dataset.codeId.split("-")[1])]?.querySelector("code")?.textContent || "";
-      const previewUrl = URL.createObjectURL(new Blob([code], { type: "text/html" }));
-      const preview = document.createElement("a");
-      preview.href = previewUrl;
-      preview.target = "_blank";
-      preview.rel = "noopener";
-      preview.click();
-      setTimeout(() => URL.revokeObjectURL(previewUrl), 60000);
-    }));
-  } else bubble.textContent = text;
   messages.appendChild(node);
   $(".conversation").scrollTop = $(".conversation").scrollHeight;
+
+  if (role === "assistant") {
+    if (options.animate !== false) {
+      typeWriter(bubble, text);
+    } else {
+      bubble.innerHTML = renderReply(text);
+      bindCodeActions(bubble);
+    }
+  } else {
+    bubble.textContent = text;
+  }
+  return node;
 }
+
 function showGenerating() {
   const node = document.createElement("div");
   node.className = "message assistant generating";
-  node.innerHTML = `<div class="message-avatar">A</div><div class="message-bubble"><span class="loading-dots"></span> Generating answer, please wait...</div>`;
+  node.innerHTML = `<div class="message-avatar">A</div><div class="message-bubble"><span class="loading-dots"><span></span></span> চিন্তা করছি...</div>`;
   messages.appendChild(node);
   $(".conversation").scrollTop = $(".conversation").scrollHeight;
 }
+
 function hideGenerating() {
   const node = messages.querySelector(".generating");
   if (node) node.remove();
@@ -415,3 +466,4 @@ $("#fileInput").addEventListener("change", (event) => {
 });
 renderHistory();
 updateProfile().then(loadCloudHistory);
+  
