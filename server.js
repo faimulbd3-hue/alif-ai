@@ -266,61 +266,82 @@ app.delete("/api/history", async (req, res) => {
 });
 
 app.post("/api/chat", async (req, res) => {
-  const { message, history = [], model, attachment } = req.body || {};
-  if (!message || typeof message !== "string" || !message.trim()) {
+  const {
+    message,
+    history = [],
+    model,
+    attachment,
+    groqApiKey,
+    googleApiKey,
+    mode = "general"
+  } = req.body || {};
+
+  if (typeof message !== "string" || !message.trim()) {
     return res.status(400).json({ error: "একটি বার্তা লিখুন।" });
   }
 
-  const provider = getProvider();
-  const apiKey = provider && (provider.name === "openrouter" ? getOpenRouterKeys()[0] : process.env[provider.key]);
-  if (!provider || !apiKey) {
-    return res.json({ reply: demoReply(message.trim()), mode: "demo" });
+  // Keys are request-scoped only: never persist them or write them to logs.
+  const requestedMode = String(mode || "general").trim().toLowerCase();
+  const codingMode = ["coding", "code", "developer"].includes(requestedMode);
+  const providerName = codingMode ? "groq" : "gemini";
+  const provider = { name: providerName, ...providerConfig[providerName] };
+  const suppliedKey = codingMode ? groqApiKey : googleApiKey;
+  const serverKey = codingMode
+    ? (process.env.GROQ_API_KEY || "")
+    : (process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "");
+  const apiKey = typeof suppliedKey === "string" && suppliedKey.trim()
+    ? suppliedKey.trim()
+    : serverKey;
+
+  if (!apiKey) {
+    const reply = demoReply(message.trim());
+    return res.json({ reply, response: reply, mode: "demo", provider: providerName });
   }
 
   try {
+    const safeHistory = Array.isArray(history)
+      ? history.slice(-12).filter((item) =>
+          item && (item.role === "user" || item.role === "assistant") &&
+          typeof item.content === "string"
+        )
+      : [];
+    const systemPrompt = codingMode
+      ? "You are Alif AI in Coding Mode. Help with programming, debugging, architecture, and technical tasks. Give accurate, runnable solutions; explain important steps clearly. Match the user's language, including natural Bengali. Never claim code was executed unless it was actually executed."
+      : "You are Alif AI, a helpful general-purpose assistant. Answer accurately and clearly. Match the user's language, including natural Bengali. Be honest about uncertainty and avoid unnecessary filler.";
     const messages = [
-      { role: "system", content: "You are Alif AI — a sharp, curious, and maximally truth-seeking assistant inspired by the spirit of Grok. You are helpful without being sycophantic, witty without being annoying, and direct without being rude. You love understanding the universe and helping humans do the same.\n\nCore rules:\n- Reply directly to the user's latest question. Do not answer older topics unless explicitly asked.\n- Match the user's primary language: natural Bengali for Bengali messages, natural English for English, or a clean natural blend only when the user mixes languages. Never insert random words from other languages.\n- Be clear, precise, and well-structured. Prefer substance over fluff.\n- For how-to, coding, troubleshooting, or process questions, use numbered steps.\n- When the user asks for HTML or any code, put the complete code in one fenced Markdown code block with the correct language tag. Never put code outside that block.\n- If an attached document is provided, answer the user's question about that document first.\n- You can be a little playful or dryly humorous when it fits, but never at the expense of truth or clarity.\n- When you don't know something, say so. When something is uncertain, say so. Prefer honest uncertainty over confident hallucination.\n- Keep responses focused and useful. Avoid unnecessary moralizing or filler." },
-      ...history.slice(-12),
-      { role: "user", content: attachment?.text
-        ? `${message.trim()}\n\nAttached file: ${attachment.name}\nFile content:\n${attachment.text.slice(0, 50000)}`
-        : message.trim() }
-    ];
-    let activeProvider = provider;
-    let activeKey = apiKey;
-    let activeModel = model || process.env[provider.model] || provider.defaultModel;
-    let result = await requestChat(activeProvider, activeKey, activeModel, messages);
-    let { response, data } = result;
-    if (!response.ok && provider.name === "openrouter") {
-      const keys = getOpenRouterKeys();
-      for (const backupKey of keys.slice(1)) {
-        result = await requestChat(provider, backupKey, activeModel, messages);
-        ({ response, data } = result);
-        if (response.ok) {
-          activeKey = backupKey;
-          break;
-        }
+      { role: "system", content: systemPrompt },
+      ...safeHistory,
+      {
+        role: "user",
+        content: attachment?.text
+          ? `${message.trim()}\n\nAttached file: ${String(attachment.name || "file")}\nFile content:\n${String(attachment.text).slice(0, 50000)}`
+          : message.trim()
       }
+    ];
+
+    const activeModel = model || process.env[provider.model] || provider.defaultModel;
+    const result = await requestChat(provider, apiKey, activeModel, messages);
+    if (!result.response.ok) {
+      // Do not forward provider error payloads: they can contain request details.
+      return res.status(502).json({
+        error: codingMode
+          ? "Groq service উত্তর দিতে পারেনি। API key, quota এবং model settings পরীক্ষা করুন।"
+          : "Google Gemini service উত্তর দিতে পারেনি। API key, quota এবং model settings পরীক্ষা করুন।"
+      });
     }
-    const shouldFallback = provider.name === "openrouter" && !response.ok;
-    const fallbackProvider = getConfiguredProvider("cloudflare");
-    if (!response.ok && shouldFallback && fallbackProvider && process.env.CLOUDFLARE_ACCOUNT_ID) {
-      activeProvider = fallbackProvider;
-      activeKey = process.env[activeProvider.key];
-      activeModel = process.env[activeProvider.model] || activeProvider.defaultModel;
-      result = await requestChat(activeProvider, activeKey, activeModel, messages);
-      ({ response, data } = result);
-    }
-    if (!response.ok) {
-      const providerError = data.error?.message || data.errors?.[0]?.message || "AI provider উত্তর দিতে পারেনি।";
-      return res.status(502).json({ error: `${activeProvider.name}: ${providerError}` });
-    }
+
     const reply = result.reply || "কোনো উত্তর পাওয়া যায়নি।";
-    return res.json({ reply, response: reply, mode: "live", provider: activeProvider.name, fallback: activeProvider.name !== provider.name });
-  } catch (error) {
-    const message = error.name === "AbortError"
-      ? "AI service উত্তর দিতে ৯০ সেকেন্ডের বেশি সময় নিয়েছে। কিছুক্ষণ পরে আবার চেষ্টা করুন।"
-      : `AI service error: ${error.message}`;
-    return res.status(502).json({ error: message });
+    return res.json({
+      reply,
+      response: reply,
+      mode: codingMode ? "coding" : "general",
+      provider: providerName
+    });
+  } catch (_error) {
+    // Intentionally omit exception details to prevent accidental secret disclosure.
+    return res.status(502).json({
+      error: "AI service-এর সঙ্গে সংযোগ করা যায়নি। কিছুক্ষণ পরে আবার চেষ্টা করুন।"
+    });
   }
 });
 
